@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bingo Board</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --accent: #f59e0b;
+    --text: #f8fafc;
+    --muted: #64748b;
+    --drawn: #22c55e;
+    --drawn-text: #052e16;
+    --latest: #ef4444;
+    --error: #fca5a5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+  }
+  body { display: flex; flex-direction: column; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: var(--panel);
+    border-bottom: 2px solid var(--accent);
+    flex-shrink: 0;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: clamp(20px, 2.5vw, 32px); letter-spacing: 2px; color: var(--accent); }
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .controls button {
+    background: var(--accent);
+    color: #111;
+    border: none;
+    padding: 10px 18px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .controls button.secondary { background: var(--muted); color: var(--text); }
+  .controls button:hover { filter: brightness(1.1); }
+  .controls button.active { background: var(--drawn); color: var(--drawn-text); }
+
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    min-height: 0;
+  }
+
+  .board-wrap {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .letters {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+  .letters div {
+    text-align: center;
+    font-size: clamp(40px, 7vh, 96px);
+    font-weight: 900;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(15, 1fr);
+    gap: 6px;
+    min-height: 0;
+  }
+  .cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--panel);
+    border-radius: 6px;
+    font-size: clamp(14px, 2.2vh, 28px);
+    font-weight: 700;
+    color: var(--muted);
+    transition: background 0.3s, color 0.3s, transform 0.3s;
+  }
+  .cell.drawn {
+    background: var(--drawn);
+    color: var(--drawn-text);
+    transform: scale(1.04);
+  }
+  .cell.latest {
+    background: var(--latest);
+    color: #fff;
+    box-shadow: 0 0 24px var(--latest);
+  }
+
+  aside {
+    background: var(--panel);
+    border-left: 2px solid var(--accent);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+  }
+  .current {
+    text-align: center;
+    padding: 20px 10px;
+    background: var(--bg);
+    border-radius: 12px;
+  }
+  .current .label { font-size: 14px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .current .ball {
+    font-size: clamp(64px, 14vh, 140px);
+    font-weight: 900;
+    color: var(--latest);
+    line-height: 1.1;
+  }
+  .stats { font-size: 16px; color: var(--muted); text-align: center; }
+  .stats strong { color: var(--text); }
+
+  .manual-box {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--bg);
+    padding: 14px;
+    border-radius: 12px;
+  }
+  .manual-box.show { display: flex; }
+  .manual-box label { font-size: 13px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .manual-row { display: flex; gap: 8px; }
+  .manual-row input {
+    flex: 1;
+    min-width: 0;
+    font-size: 22px;
+    font-weight: 700;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 2px solid var(--muted);
+    background: var(--panel);
+    color: var(--text);
+    text-transform: uppercase;
+  }
+  .manual-row input:focus { outline: none; border-color: var(--accent); }
+  .manual-row button {
+    background: var(--accent);
+    color: #111;
+    border: none;
+    padding: 10px 14px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .error { min-height: 20px; font-size: 14px; color: var(--error); }
+
+  .history-title { font-size: 14px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .history {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-content: flex-start;
+  }
+  .history span {
+    background: var(--bg);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .hint { font-size: 13px; color: var(--muted); text-align: center; }
+
+  footer {
+    padding: 6px 24px;
+    font-size: 13px;
+    color: var(--muted);
+    background: var(--panel);
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .flash {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.85);
+    font-size: min(40vw, 40vh);
+    font-weight: 900;
+    color: var(--accent);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+  }
+  .flash.show { opacity: 1; }
+  .flash.show.big { animation: pop 0.5s; }
+  @keyframes pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎲 BINGO</h1>
+  <div class="controls">
+    <button id="modeBtn" class="secondary" title="M">Mode: Auto draw (M)</button>
+    <button id="drawBtn" title="Space or Enter">Draw Next (Space)</button>
+    <button id="undoBtn" class="secondary" title="Z">Undo (Z)</button>
+    <button id="fsBtn" class="secondary" title="F">Fullscreen (F)</button>
+    <button id="resetBtn" class="secondary" title="R">Reset (R)</button>
+  </div>
+</header>
+
+<main>
+  <section class="board-wrap">
+    <div class="letters">
+      <div>B</div><div>I</div><div>N</div><div>G</div><div>O</div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <aside>
+    <div class="current">
+      <div class="label">Latest Call</div>
+      <div class="ball" id="currentBall">—</div>
+    </div>
+
+    <div class="manual-box" id="manualBox">
+      <label for="manualInput">Enter a number you drew</label>
+      <div class="manual-row">
+        <input id="manualInput" type="text" inputmode="text" autocomplete="off" placeholder="e.g. N37 or 37" maxlength="4">
+        <button id="recordBtn">Record</button>
+      </div>
+      <div class="error" id="errorMsg"></div>
+    </div>
+
+    <div class="stats">Called: <strong id="count">0</strong> / 75</div>
+    <div class="history-title">Previously called</div>
+    <div class="history" id="history"></div>
+    <div class="hint" id="hintText"></div>
+  </aside>
+</main>
+
+<footer>Tip: press F to go fullscreen, then share this window with your projector / TV</footer>
+
+<div class="flash" id="flash"></div>
+
+<script>
+(function () {
+  const LETTERS = ['B', 'I', 'N', 'G', 'O'];
+  const RANGES  = { B: [1, 15], I: [16, 30], N: [31, 45], G: [46, 60], O: [61, 75] };
+
+  const grid = document.getElementById('grid');
+  const historyEl = document.getElementById('history');
+  const currentEl = document.getElementById('currentBall');
+  const countEl = document.getElementById('count');
+  const flash = document.getElementById('flash');
+  const modeBtn = document.getElementById('modeBtn');
+  const drawBtn = document.getElementById('drawBtn');
+  const manualBox = document.getElementById('manualBox');
+  const manualInput = document.getElementById('manualInput');
+  const recordBtn = document.getElementById('recordBtn');
+  const errorMsg = document.getElementById('errorMsg');
+  const hintText = document.getElementById('hintText');
+
+  // Build board: 15 rows x 5 columns, one column per letter.
+  const cells = {};
+  const numbers = [];
+  for (let r = 0; r < 15; r++) {
+    for (let c = 0; c < 5; c++) {
+      const L = LETTERS[c];
+      const n = RANGES[L][0] + r;
+      const el = document.createElement('div');
+      el.className = 'cell';
+      el.textContent = n;
+      grid.appendChild(el);
+      cells[n] = el;
+      numbers.push(n);
+    }
+  }
+
+  let drawn = [];   // numbers in the order they were called
+  let mode = 'auto'; // 'auto' or 'manual'
+
+  function letterFor(n) {
+    for (const L of LETTERS) {
+      if (n >= RANGES[L][0] && n <= RANGES[L][1]) return L;
+    }
+    return '';
+  }
+
+  function showFlash(text, big) {
+    flash.textContent = text;
+    flash.classList.remove('big');
+    void flash.offsetWidth;
+    if (big) flash.classList.add('big');
+    flash.classList.add('show');
+    clearTimeout(showFlash._t);
+    showFlash._t = setTimeout(() => flash.classList.remove('show'), 900);
+  }
+
+  function setError(msg) { errorMsg.textContent = msg; }
+
+  function render() {
+    for (const n of numbers) cells[n].classList.remove('drawn', 'latest');
+    drawn.forEach(n => cells[n].classList.add('drawn'));
+    if (drawn.length) cells[drawn[drawn.length - 1]].classList.add('latest');
+
+    currentEl.textContent = drawn.length
+      ? letterFor(drawn[drawn.length - 1]) + drawn[drawn.length - 1]
+      : '—';
+
+    countEl.textContent = drawn.length;
+
+    historyEl.innerHTML = '';
+    for (let i = drawn.length - 2; i >= 0; i--) {
+      const s = document.createElement('span');
+      s.textContent = letterFor(drawn[i]) + drawn[i];
+      historyEl.appendChild(s);
+    }
+  }
+
+  function record(n) {
+    drawn.push(n);
+    render();
+    showFlash(letterFor(n) + n, true);
+  }
+
+  // Auto mode: pick a random number that hasn't been called yet.
+  function drawAuto() {
+    const called = new Set(drawn);
+    const pool = numbers.filter(n => !called.has(n));
+    if (!pool.length) { showFlash('ALL 75 CALLED', false); return; }
+    record(pool[Math.floor(Math.random() * pool.length)]);
+  }
+
+  // Manual mode: accept "N37", "n 37" or just "37" typed from a physical draw.
+  function recordManual() {
+    const raw = manualInput.value.trim().toUpperCase();
+    const m = raw.match(/^([BINGO])?\s*(\d{1,2})$/);
+    if (!m) { setError('Type a call such as N37 or 37'); return; }
+
+    const n = parseInt(m[2], 10);
+    if (n < 1 || n > 75) { setError('Numbers run from 1 to 75'); return; }
+
+    const actual = letterFor(n);
+    if (m[1] && m[1] !== actual) {
+      setError(`${n} is ${actual}${n}, not ${m[1]}${n}`);
+      return;
+    }
+    if (drawn.includes(n)) {
+      setError(`${actual}${n} has already been called`);
+      return;
+    }
+
+    setError('');
+    manualInput.value = '';
+    record(n);
+  }
+
+  function undo() {
+    if (!drawn.length) return;
+    drawn.pop();
+    render();
+    setError('');
+  }
+
+  function reset() {
+    if (drawn.length && !confirm('Reset the board and clear all called numbers?')) return;
+    drawn = [];
+    setError('');
+    manualInput.value = '';
+    render();
+  }
+
+  function setMode(newMode) {
+    mode = newMode;
+    const manual = mode === 'manual';
+    manualBox.classList.toggle('show', manual);
+    drawBtn.style.display = manual ? 'none' : '';
+    modeBtn.textContent = manual ? 'Mode: Manual entry (M)' : 'Mode: Auto draw (M)';
+    modeBtn.classList.toggle('active', manual);
+    hintText.textContent = manual
+      ? 'Type each number you draw outside the app • Enter = record • Z = undo • M = switch mode'
+      : 'Space = draw • Z = undo • R = reset • M = switch mode';
+    setError('');
+    if (manual) manualInput.focus();
+  }
+
+  function toggleMode() {
+    setMode(mode === 'auto' ? 'manual' : 'auto');
+  }
+
+  function toggleFs() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen && document.exitFullscreen();
+    }
+  }
+
+  modeBtn.addEventListener('click', toggleMode);
+  drawBtn.addEventListener('click', drawAuto);
+  recordBtn.addEventListener('click', recordManual);
+  document.getElementById('undoBtn').addEventListener('click', undo);
+  document.getElementById('resetBtn').addEventListener('click', reset);
+  document.getElementById('fsBtn').addEventListener('click', toggleFs);
+
+  manualInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); recordManual(); }
+    if (e.key === 'Escape') { manualInput.blur(); }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.target === manualInput) return; // typing: leave keys alone
+    if (e.target.tagName === 'BUTTON') e.target.blur();
+
+    if (e.code === 'Space' && mode === 'auto') { e.preventDefault(); drawAuto(); }
+    else if (e.key === 'z' || e.key === 'Z') undo();
+    else if (e.key === 'r' || e.key === 'R') reset();
+    else if (e.key === 'f' || e.key === 'F') toggleFs();
+    else if (e.key === 'm' || e.key === 'M') toggleMode();
+  });
+
+  setMode('auto');
+  render();
+})();
+</script>
+</body>
+</html>
